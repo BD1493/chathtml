@@ -4,15 +4,19 @@
     <meta charset="UTF-8">
     <title>Mesh Gateway</title>
     <script src="gun.js"></script>
-    <script>if(typeof Gun === 'undefined'){ document.write('<script src="https://cdn.jsdelivr.net/npm/gun/gun.js"><\/script>'); }</script>
-    
+    <script>
+        // Fallback if local file fails
+        if(typeof Gun === 'undefined'){
+            document.write('<script src="https://cdn.jsdelivr.net/npm/gun/gun.js"><\/script>');
+        }
+    </script>
     <style>
         :root { --bg: #36393f; --side: #2f3136; --header: #202225; --accent: #7289da; --text: #dcddde; --danger: #ed4245; }
         body { font-family: 'Helvetica Neue', sans-serif; margin: 0; display: flex; height: 100vh; background: var(--bg); color: var(--text); overflow: hidden; }
         .sidebar { width: 260px; background: var(--side); display: flex; flex-direction: column; border-right: 1px solid #202225; }
         .main { flex: 1; display: flex; flex-direction: column; }
         .members-bar { width: 200px; background: var(--side); border-left: 1px solid #202225; padding: 15px; }
-        .header { padding: 15px; background: var(--header); display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10; }
+        .header { padding: 15px; background: var(--header); display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         #messages { flex: 1; overflow-y: auto; padding: 25px; list-style: none; margin: 0; }
         .msg { background: #40444b; padding: 12px; border-radius: 8px; margin-bottom: 12px; max-width: 80%; line-height: 1.4; border-left: 4px solid transparent; }
         .msg.admin-msg { border-left-color: gold !important; background: #4e4632 !important; }
@@ -36,86 +40,75 @@
 
 <div id="login-modal" class="overlay">
     <div class="login-box">
-        <h1 style="margin-top:0">Mesh Login</h1>
-        <input type="text" id="entry-name" placeholder="Choose a Username">
+        <h1>Mesh Login</h1>
+        <input type="text" id="entry-name" placeholder="Username">
         <div class="tabs">
             <button id="t-pub" class="active" onclick="setTab('pub')">Public</button>
             <button id="t-join" onclick="setTab('join')">Join ID</button>
             <button id="t-create" onclick="setTab('create')">Create</button>
         </div>
-        <div id="tab-create" style="display:none"><input type="text" id="new-subj" placeholder="Subject..."><button class="btn-blue" style="width:100%" onclick="initMesh('create')">Launch Room</button></div>
-        <div id="tab-join" style="display:none"><input type="text" id="join-id" placeholder="6-Digit ID"><button class="btn-blue" style="width:100%" onclick="initMesh('join')">Join Room</button></div>
-        <div id="tab-pub"><button class="btn-blue" style="width:100%" onclick="initMesh('pub')">Enter Public Lobby</button></div>
+        <div id="tab-create" style="display:none"><input type="text" id="new-subj" placeholder="Subject..."><button class="btn-blue" style="width:100%" onclick="initMesh('create')">Launch</button></div>
+        <div id="tab-join" style="display:none"><input type="text" id="join-id" placeholder="Room ID"><button class="btn-blue" style="width:100%" onclick="initMesh('join')">Join</button></div>
+        <div id="tab-pub"><button class="btn-blue" style="width:100%" onclick="initMesh('pub')">Enter Lobby</button></div>
     </div>
 </div>
 
 <div class="sidebar">
-    <div class="header">Mesh Channels</div>
+    <div class="header">Channels</div>
     <div style="padding: 20px; flex: 1;">
         <div style="background:#202225; padding:15px; border-radius:8px;">
             <div id="room-id-tag" style="font-size:11px; color:var(--accent); font-weight:bold;"></div>
             <div id="room-subj-tag" style="font-size:18px; margin-top:5px;"></div>
         </div>
         <br>
-        <button onclick="exportHistory()" style="width:100%; margin-bottom:10px;">💾 Download History</button>
+        <button onclick="exportHistory()" style="width:100%; margin-bottom:10px;">💾 Logs</button>
         <button onclick="logout()" style="width:100%; background:var(--danger);">🚪 Logout</button>
     </div>
 </div>
 
 <div class="main">
     <div class="header">
-        <span id="net-status">📡 Connecting...</span>
-        <button onclick="location.replace('https://classroom.google.com')" style="background:var(--danger); font-size:11px;">PANIC EXIT</button>
+        <span id="net-status">📡 Syncing...</span>
+        <button onclick="location.replace('https://google.com')" style="background:var(--danger); font-size:11px;">PANIC</button>
     </div>
     <ul id="messages"></ul>
     <div class="input-bar">
         <input type="file" id="file-btn" style="display:none" onchange="uploadFile()">
         <button onclick="document.getElementById('file-btn').click()">📁</button>
-        <input type="text" id="chat-in" placeholder="Say something..." style="flex:1" onkeydown="if(event.key==='Enter') sendMsg()">
+        <input type="text" id="chat-in" placeholder="Message..." style="flex:1" onkeydown="if(event.key==='Enter') sendMsg()">
         <button class="btn-blue" onclick="sendMsg()">Send</button>
     </div>
 </div>
 
 <div class="members-bar">
-    <div style="font-size:11px; color:#8e9297; margin-bottom:15px; font-weight:bold; letter-spacing:1px;">MEMBERS</div>
+    <div style="font-size:11px; color:#8e9297; margin-bottom:15px; font-weight:bold;">MEMBERS</div>
     <div id="member-list"></div>
 </div>
 
 <div id="admin-panel">
-    <h1 style="color:gold">Super Admin Console</h1>
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-        <div>
-            <h3>Active Network Registry</h3>
-            <div id="admin-rooms" style="background:#202225; padding:15px; border-radius:8px; height:300px; overflow-y:auto;"></div>
-        </div>
-        <div>
-            <h3>Security & Global</h3>
-            <input type="text" id="broadcast-msg" placeholder="Global Broadcast Message" style="width:100%; margin-bottom:10px;">
-            <button class="btn-blue" onclick="globalBroadcast()">📣 Send to All Rooms</button>
-            <br><br>
-            <input type="password" id="new-admin-key" placeholder="New Access Key">
-            <button onclick="updateKey()">Update Admin Key</button>
-        </div>
-    </div>
-    <br><br>
-    <button onclick="document.getElementById('admin-panel').style.display='none'">Close Dashboard</button>
+    <h1 style="color:gold">Admin Panel</h1>
+    <div id="admin-rooms" style="background:#202225; padding:15px; border-radius:8px; height:200px; overflow-y:auto; margin-bottom:20px;"></div>
+    <input type="text" id="broadcast-msg" placeholder="Global Message" style="width:100%; margin-bottom:10px;">
+    <button class="btn-blue" onclick="globalBroadcast()">📣 Broadcast</button>
+    <button onclick="document.getElementById('admin-panel').style.display='none'">Close</button>
 </div>
 
 <script>
-    const gun = Gun(['https://github.com/BD1493/chathtml/gun.js', 'https://peer.wall.org/gun', 'https://gundb.herokuapp.com/gun']);
-    
-    // PERSISTENCE: Check for saved session
+    // These are the relay peers. Gun will automatically try them over WSS.
+    // We provide several so if one fails, the mesh stays alive.
+    const gun = Gun([
+        'https://gun-manhattan.herokuapp.com/gun',
+        'https://peer.wall.org/gun',
+        'https://gundb.herokuapp.com/gun'
+    ]);
+
     let myUser = localStorage.getItem('mesh_user') || "";
     let myRoom = localStorage.getItem('mesh_room') || "";
     let mySubj = localStorage.getItem('mesh_subj') || "";
     let isHost = localStorage.getItem('mesh_host') === 'true';
     let adminKey = "admin123";
 
-    window.onload = () => {
-        if(myUser && myRoom) launchChat(mySubj, myRoom);
-    };
-
-    gun.get('MESH_SYS_V9').get('auth').on(k => { if(k) adminKey = k; });
+    window.onload = () => { if(myUser && myRoom) launchChat(mySubj, myRoom); };
 
     function setTab(t) {
         ['pub', 'join', 'create'].forEach(id => {
@@ -126,25 +119,22 @@
 
     function initMesh(type) {
         myUser = document.getElementById('entry-name').value;
-        if(!myUser) return alert("Identify yourself!");
+        if(!myUser) return alert("Name required");
         localStorage.setItem('mesh_user', myUser);
 
         if(type === 'pub') {
-            myRoom = "GLOBAL_v9"; mySubj = "Public Lobby";
-            launchChat(mySubj, myRoom);
+            launchChat("Public Lobby", "GLOBAL_v9");
         } else if(type === 'create') {
-            myRoom = Math.floor(100000 + Math.random() * 900000).toString();
-            mySubj = document.getElementById('new-subj').value || "No Subject";
-            gun.get('MASTER_REGISTRY_V9').get(myRoom).put({id: myRoom, s: mySubj, h: myUser});
-            isHost = true;
-            localStorage.setItem('mesh_host', 'true');
-            launchChat(mySubj, myRoom);
+            let id = Math.floor(100000 + Math.random() * 900000).toString();
+            let s = document.getElementById('new-subj').value || "No Subject";
+            gun.get('MASTER_REGISTRY_V9').get(id).put({id: id, s: s, h: myUser});
+            isHost = true; localStorage.setItem('mesh_host', 'true');
+            launchChat(s, id);
         } else {
-            myRoom = document.getElementById('join-id').value;
-            gun.get('MASTER_REGISTRY_V9').get(myRoom).once(d => {
-                mySubj = d ? d.s : "Room";
+            let id = document.getElementById('join-id').value;
+            gun.get('MASTER_REGISTRY_V9').get(id).once(d => {
                 if(d && d.h === myUser) { isHost = true; localStorage.setItem('mesh_host', 'true'); }
-                launchChat(mySubj, myRoom);
+                launchChat(d ? d.s : "Room", id);
             });
         }
     }
@@ -153,12 +143,11 @@
         myRoom = id; mySubj = s;
         localStorage.setItem('mesh_room', id);
         localStorage.setItem('mesh_subj', s);
-        
         document.getElementById('login-modal').style.display = 'none';
-        document.getElementById('room-id-tag').innerText = "ROOM ID: " + id;
+        document.getElementById('room-id-tag').innerText = "ID: " + id;
         document.getElementById('room-subj-tag').innerText = s;
         document.getElementById('net-status').innerText = "🟢 CONNECTED";
-        startMeshEngine();
+        startMesh();
     }
 
     function sendMsg() {
@@ -168,90 +157,52 @@
         document.getElementById('chat-in').value = "";
     }
 
-    function uploadFile() {
-        const file = document.getElementById('file-btn').files[0];
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            gun.get('CHATS_V9').get(myRoom).get('messages').set({u: myUser, b: e.target.result, t: 'img', time: Date.now()});
-        };
-        reader.readAsDataURL(file);
-    }
-
-    function startMeshEngine() {
+    function startMesh() {
+        // Only render messages once to prevent duplicates
+        const seen = new Set();
         gun.get('CHATS_V9').get(myRoom).get('messages').map().once((data, id) => {
-            if(!data) return;
+            if(!data || seen.has(id)) return;
+            seen.add(id);
             const li = document.createElement('li');
             li.className = 'msg' + (data.u === 'SYSTEM' ? ' admin-msg' : '');
-            let body = (data.t === 'img') ? `<img src="${data.b}">` : data.b;
-            let hTools = (isHost) ? `<span class="host-tool" onclick="nuke('${id}')">DELETE</span>` : "";
-            
-            li.innerHTML = `<b>${data.u}</b> ${body} ${hTools}`;
+            li.innerHTML = `<b>${data.u}</b> ${data.t === 'img' ? `<img src="${data.b}">` : data.b}`;
             document.getElementById('messages').appendChild(li);
             document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
         });
 
+        // Presence Logic
         setInterval(() => gun.get('CHATS_V9').get(myRoom).get('users').get(myUser).put(Date.now()), 5000);
         gun.get('CHATS_V9').get(myRoom).get('users').map().on((time, name) => {
             const list = document.getElementById('member-list');
             if(Date.now() - time < 15000) {
-                if(!document.getElementById('mem-'+name)) {
-                    list.innerHTML += `<div id="mem-${name}" class="member-item"><div class="status-on"></div>${name}</div>`;
-                }
+                if(!document.getElementById('mem-'+name)) list.innerHTML += `<div id="mem-${name}"><div class="status-on"></div>${name}</div>`;
             } else {
                 let el = document.getElementById('mem-'+name); if(el) el.remove();
             }
         });
     }
 
-    function nuke(id) { gun.get('CHATS_V9').get(myRoom).get('messages').get(id).put(null); location.reload(); }
+    function globalBroadcast() {
+        let msg = document.getElementById('broadcast-msg').value;
+        gun.get('MASTER_REGISTRY_V9').map().once((d, id) => {
+            if(id) gun.get('CHATS_V9').get(id).get('messages').set({u: 'SYSTEM', b: 'GLOBAL: ' + msg, t: 'txt', time: Date.now()});
+        });
+        alert("Sent");
+    }
 
     function logout() { localStorage.clear(); location.reload(); }
 
-    let enters = 0;
     window.addEventListener('keydown', (e) => {
-        if(e.key === "Enter") enters++;
-        if(e.shiftKey && e.key === "I" && enters >= 2) {
-            if(prompt("Admin Access Code:") === adminKey) {
+        if(e.shiftKey && e.key === "I") {
+            if(prompt("Code:") === adminKey) {
                 document.getElementById('admin-panel').style.display = 'block';
-                loadAdminData();
+                const reg = document.getElementById('admin-rooms'); reg.innerHTML = "";
+                gun.get('MASTER_REGISTRY_V9').map().once((d, id) => {
+                    if(d) reg.innerHTML += `<div>${id} - ${d.s} <button onclick="launchChat('${d.s}','${id}')">Join</button></div>`;
+                });
             }
-            enters = 0;
         }
     });
-
-    function loadAdminData() {
-        const reg = document.getElementById('admin-rooms');
-        reg.innerHTML = "";
-        gun.get('MASTER_REGISTRY_V9').map().once((d, id) => {
-            if(d) reg.innerHTML += `<div style="padding:10px; border-bottom:1px solid #444;">ID: ${id} | Subject: ${d.s} <button onclick="launchChat('${d.s}','${id}')">Join</button></div>`;
-        });
-    }
-
-    // FIXED GLOBAL BROADCAST
-    function globalBroadcast() {
-        let msg = document.getElementById('broadcast-msg').value;
-        if(!msg) return;
-        gun.get('MASTER_REGISTRY_V9').map().once((data, roomID) => {
-            if(roomID) gun.get('CHATS_V9').get(roomID).get('messages').set({
-                u: 'SYSTEM', b: 'GLOBAL BROADCAST: ' + msg, t: 'txt', time: Date.now()
-            });
-        });
-        // Also send to Public lobby
-        gun.get('CHATS_V9').get('GLOBAL_v9').get('messages').set({
-            u: 'SYSTEM', b: 'GLOBAL BROADCAST: ' + msg, t: 'txt', time: Date.now()
-        });
-        alert("Broadcast sent to all registry nodes.");
-    }
-
-    function updateKey() {
-        let k = document.getElementById('new-admin-key').value;
-        if(k) { gun.get('MESH_SYS_V9').get('auth').put(k); alert("Key Updated."); }
-    }
-
-    function exportHistory() {
-        const b = new Blob([document.getElementById('messages').innerText], {type: 'text/plain'});
-        const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `mesh_log_${myRoom}.txt`; a.click();
-    }
 </script>
 </body>
 </html>
