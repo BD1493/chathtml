@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Educational Graph Project</title>
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <style>
+        :root { --main: #36393f; --side: #2f3136; --accent: #7289da; --text: #dcddde; }
+        body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; background: var(--main); color: var(--text); overflow: hidden; }
+        
+        /* Sidebar */
+        .sidebar { width: 240px; background: var(--side); padding: 15px; display: flex; flex-direction: column; gap: 10px; border-right: 1px solid #202225; }
+        .sidebar h3 { font-size: 12px; text-transform: uppercase; color: #8e9297; margin-bottom: 5px; }
+        
+        /* Buttons */
+        button { padding: 8px; border-radius: 4px; border: none; cursor: pointer; background: #4f545c; color: white; transition: 0.2s; }
+        button:hover { background: var(--accent); }
+        .panic-btn { background: #ed4245; font-weight: bold; }
+        .public-btn { background: #43b581; font-weight: bold; }
+
+        /* Main Chat */
+        .chat-area { flex: 1; display: flex; flex-direction: column; }
+        #messages { flex: 1; overflow-y: auto; padding: 20px; list-style: none; margin: 0; }
+        .msg { background: #40444b; padding: 10px; border-radius: 8px; margin-bottom: 10px; position: relative; max-width: 85%; }
+        .msg b { color: var(--accent); display: block; font-size: 13px; }
+        .msg img { max-width: 100%; border-radius: 4px; margin-top: 5px; display: block; }
+        
+        /* Controls */
+        .input-box { padding: 20px; background: var(--main); display: flex; gap: 10px; align-items: center; }
+        input { background: #40444b; border: none; padding: 10px; color: white; border-radius: 5px; }
+        #msg-input { flex: 1; }
+
+        /* Admin Dashboard Overlay */
+        #admin-dash { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; padding: 50px; }
+        .dash-content { background: var(--side); height: 100%; border-radius: 10px; padding: 20px; border: 2px solid var(--accent); }
+        .room-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #444; }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <button class="panic-btn" onclick="panic()">⚠️ EMERGENCY CLOSE</button>
+    <hr>
+    <button class="public-btn" onclick="joinRoom('Global_Lobby')">🌍 Public Lobby</button>
+    <h3>Active Room</h3>
+    <input type="text" id="room-id" value="Global_Lobby" onchange="switchRoom()">
+    <h3>Channels</h3>
+    <button onclick="setChannel('general')">#general</button>
+    <button onclick="setChannel('files')">#files</button>
+    <hr>
+    <button onclick="exportChat()">💾 Save Logs</button>
+</div>
+
+<div class="chat-area">
+    <ul id="messages"></ul>
+    <div class="input-box">
+        <input type="text" id="username" placeholder="User" style="width: 80px;">
+        <input type="file" id="file-hidden" style="display:none" onchange="uploadFile()">
+        <button onclick="document.getElementById('file-hidden').click()">📁</button>
+        <input type="text" id="msg-input" placeholder="Message..." onkeydown="if(event.key==='Enter') send()">
+        <button onclick="send()">Send</button>
+    </div>
+</div>
+
+<div id="admin-dash">
+    <div class="dash-content">
+        <h2>Network Master Control</h2>
+        <div id="room-list" style="height: 300px; overflow-y: auto; background: #202225; margin-bottom: 20px;"></div>
+        <button onclick="document.getElementById('admin-dash').style.display='none'">Exit Dashboard</button>
+        <button onclick="location.reload()" style="background:orange">Refresh Network</button>
+    </div>
+</div>
+
+<script>
+    // 1. SYSTEM CONFIG
+    const gun = Gun(['https://gun-manhattan.herokuapp.com/gun']);
+    let currentChannel = 'general';
+    let isAdmin = false;
+    let enterCount = 0;
+    let lastEnter = 0;
+
+    // 2. PANIC SYSTEM
+    function panic() {
+        document.body.innerHTML = "";
+        window.location.replace("https://classroom.google.com");
+    }
+
+    // 3. KEYBOARD LISTENERS (Secret Admin Combo)
+    window.addEventListener('keydown', (e) => {
+        const now = Date.now();
+        if (e.key === "Enter") {
+            enterCount = (now - lastEnter < 800) ? enterCount + 1 : 1;
+            lastEnter = now;
+        }
+        if (e.shiftKey && e.key === "I" && enterCount >= 2) {
+            e.preventDefault();
+            let p = prompt("Enter Super Admin Key:");
+            if (p === "YOUR_SUPER_SECRET_CODE") { // CHANGE THIS!
+                isAdmin = true;
+                document.getElementById('admin-dash').style.display = 'block';
+                scanRooms();
+            }
+        }
+        if (e.key === "Escape") panic();
+    });
+
+    // 4. CHAT LOGIC
+    function joinRoom(id) {
+        document.getElementById('room-id').value = id;
+        switchRoom();
+    }
+
+    function switchRoom() {
+        document.getElementById('messages').innerHTML = "";
+        const room = document.getElementById('room-id').value;
+        gun.get('MASTER_ROOM_LIST').get(room).put(true);
+        listen();
+    }
+
+    function setChannel(ch) {
+        currentChannel = ch;
+        document.getElementById('messages').innerHTML = "";
+        listen();
+    }
+
+    function send() {
+        const room = document.getElementById('room-id').value;
+        const user = document.getElementById('username').value || "Anon";
+        const text = document.getElementById('msg-input').value;
+        if(!text) return;
+
+        gun.get(room).get(currentChannel).set({
+            user, body: text, type: 'text', time: Date.now()
+        });
+        document.getElementById('msg-input').value = "";
+    }
+
+    function uploadFile() {
+        const file = document.getElementById('file-hidden').files[0];
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const room = document.getElementById('room-id').value;
+            gun.get(room).get(currentChannel).set({
+                user: document.getElementById('username').value || "Anon",
+                body: e.target.result, type: 'file', time: Date.now()
+            });
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function listen() {
+        const room = document.getElementById('room-id').value;
+        const list = document.getElementById('messages');
+        gun.get(room).get(currentChannel).map().once((data, id) => {
+            if (!data) return;
+            const li = document.createElement('li');
+            li.className = 'msg';
+            let content = data.type === 'file' ? `<img src="${data.body}">` : data.body;
+            
+            li.innerHTML = `<b>${data.user}</b> ${content}`;
+            if(isAdmin) {
+                li.innerHTML += `<button onclick="del('${id}')" style="font-size:9px;color:red;margin-left:10px">DEL</button>`;
+            }
+            list.appendChild(li);
+            list.scrollTop = list.scrollHeight;
+        });
+    }
+
+    // 5. ADMIN TOOLS
+    function del(id) {
+        const room = document.getElementById('room-id').value;
+        gun.get(room).get(currentChannel).get(id).put(null);
+        location.reload(); 
+    }
+
+    function scanRooms() {
+        const listDiv = document.getElementById('room-list');
+        listDiv.innerHTML = "";
+        gun.get('MASTER_ROOM_LIST').map().once((val, key) => {
+            if(val) listDiv.innerHTML += `<div class="room-item"><span>${key}</span><button onclick="joinRoom('${key}')">Go</button></div>`;
+        });
+    }
+
+    function exportChat() {
+        const blob = new Blob([document.getElementById('messages').innerText], {type: 'text/plain'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'chat_log.txt';
+        a.click();
+    }
+
+    listen(); // Start initial listener
+</script>
+</body>
+</html>
