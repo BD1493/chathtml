@@ -2,183 +2,206 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MeshChat v6.0</title>
+    <title>MeshChat v7.0</title>
     <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
     <style>
         :root { --bg: #36393f; --side: #2f3136; --header: #202225; --accent: #7289da; --text: #dcddde; }
         body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; height: 100vh; background: var(--bg); color: var(--text); overflow: hidden; }
         
-        /* Layout */
         .sidebar-left { width: 260px; background: var(--side); display: flex; flex-direction: column; border-right: 1px solid #202225; }
-        .main { flex: 1; display: flex; flex-direction: column; }
+        .main { flex: 1; display: flex; flex-direction: column; position: relative; }
         .sidebar-right { width: 200px; background: var(--side); border-left: 1px solid #202225; padding: 15px; }
 
-        /* UI Components */
-        .sidebar-header { padding: 15px; font-weight: bold; background: var(--header); }
+        .chat-header { padding: 15px; background: var(--header); font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
         #messages { flex: 1; overflow-y: auto; padding: 20px; list-style: none; margin: 0; }
-        .msg { background: #40444b; padding: 12px; border-radius: 8px; margin-bottom: 10px; max-width: 85%; }
-        .msg b { color: var(--accent); display: block; font-size: 0.8em; }
         
-        .input-area { padding: 20px; background: var(--bg); display: flex; gap: 10px; }
+        .msg { background: #40444b; padding: 12px; border-radius: 8px; margin-bottom: 10px; max-width: 85%; position: relative; }
+        .msg b { color: var(--accent); display: block; font-size: 0.8em; }
+        .msg img { max-width: 100%; border-radius: 5px; margin-top: 5px; display: block; }
+        
+        .input-area { padding: 20px; background: var(--bg); display: flex; gap: 10px; border-top: 1px solid #202225; }
         input, button { padding: 10px; border-radius: 5px; border: none; background: #40444b; color: white; }
-        .btn-action { background: var(--accent); cursor: pointer; }
+        .btn-action { background: var(--accent); cursor: pointer; font-weight: bold; }
+        .btn-host { color: #ff4747; cursor: pointer; font-size: 10px; margin-left: 10px; border: 1px solid #ff4747; padding: 2px; }
 
-        /* Modals */
-        .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:1000; justify-content:center; align-items:center; display:flex; }
-        .modal-content { background: var(--side); padding: 30px; border-radius: 10px; width: 400px; border: 1px solid var(--accent); }
-        #admin-modal { display:none; }
-        #entry-modal { display:flex; } /* Shows on load */
+        .member-item { padding: 5px 0; font-size: 0.9em; display: flex; align-items: center; gap: 8px; }
+        .dot { width: 8px; height: 8px; background: #43b581; border-radius: 50%; }
+
+        .modal { position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:1000; display:flex; justify-content:center; align-items:center; }
+        .modal-content { background: var(--side); padding: 30px; border-radius: 10px; width: 350px; text-align: center; border: 1px solid var(--accent); }
     </style>
 </head>
 <body>
 
-<div id="entry-modal" class="modal">
+<div id="setup-modal" class="modal">
     <div class="modal-content">
-        <h2 id="entry-title">Enter MeshChat</h2>
-        <input type="text" id="global-username" placeholder="Your Name" style="width:94%; margin-bottom:10px;"><br>
-        
-        <div id="create-section">
-            <input type="text" id="room-subject" placeholder="Subject (Optional)" style="width:94%; margin-bottom:10px;">
-            <button onclick="finalizeCreate()" class="btn-action" style="width:100%">Create Room</button>
-            <p onclick="toggleEntry(false)" style="font-size:12px; cursor:pointer; text-align:center;">Or Join Existing Room</p>
-        </div>
-
-        <div id="join-section" style="display:none;">
-            <input type="text" id="room-id-input" placeholder="Room ID (6 Digits)" style="width:94%; margin-bottom:10px;">
-            <button onclick="finalizeJoin()" class="btn-action" style="width:100%">Join Room</button>
-            <p onclick="toggleEntry(true)" style="font-size:12px; cursor:pointer; text-align:center;">Or Create New Room</p>
+        <h2>Mesh Portal</h2>
+        <input type="text" id="my-name" placeholder="Your Name" style="width:90%; margin-bottom:10px;">
+        <div id="choice-ui">
+            <input type="text" id="room-subj" placeholder="Subject (Optional)" style="width:90%; margin-bottom:10px;">
+            <button onclick="createRoom()" class="btn-action" style="width:100%">Create New Room</button>
+            <p>-- OR --</p>
+            <input type="text" id="join-id" placeholder="6-Digit Room ID" style="width:90%; margin-bottom:10px;">
+            <button onclick="joinRoom()" class="btn-action" style="width:100%">Join Existing</button>
         </div>
     </div>
 </div>
 
 <div class="sidebar-left">
-    <div class="sidebar-header">Rooms & Subjects</div>
-    <div id="room-list" style="padding:10px; flex:1;"></div>
-    <div style="padding:10px;"><button onclick="location.reload()" style="width:100%">Exit Room</button></div>
+    <div style="padding:15px; background:var(--header); font-weight:bold;">Room Controls</div>
+    <div style="padding:15px; flex:1;">
+        <p id="display-id" style="color:var(--accent); font-weight:bold;"></p>
+        <button onclick="exportLogs()" style="width:100%; margin-bottom:5px;">💾 Export History</button>
+        <button onclick="location.reload()" style="width:100%; background:#ed4245;">🚪 Exit Room</button>
+    </div>
 </div>
 
 <div class="main">
-    <div style="padding:15px; background:var(--header); font-weight:bold;" id="chat-title"># MeshChat</div>
+    <div class="chat-header">
+        <span id="topic-display">Connecting...</span>
+        <button onclick="location.replace('https://google.com')" style="background:#ed4245; font-size:10px;">PANIC</button>
+    </div>
     <ul id="messages"></ul>
     <div class="input-area">
-        <input type="file" id="file-input" style="display:none" onchange="sendFile()">
-        <button onclick="document.getElementById('file-input').click()">📁</button>
-        <input type="text" id="msg-input" placeholder="Type a message..." style="flex:1" onkeydown="if(event.key==='Enter') send()">
+        <input type="file" id="file-up" style="display:none" onchange="handleFile()">
+        <button onclick="document.getElementById('file-up').click()">📁</button>
+        <input type="text" id="msg-in" placeholder="Type a message..." style="flex:1" onkeydown="if(event.key==='Enter') send()">
         <button class="btn-action" onclick="send()">Send</button>
     </div>
 </div>
 
 <div class="sidebar-right">
-    <div style="font-size:12px; color:gray; margin-bottom:10px;">ONLINE</div>
+    <div style="font-size:11px; color:gray; margin-bottom:10px;">MEMBERS</div>
     <div id="member-list"></div>
 </div>
 
-<div id="admin-modal" class="modal">
-    <div class="modal-content" style="max-width:600px; width:80%;">
-        <h2>Super Admin Panel</h2>
-        <div style="background:#202225; height:200px; overflow-y:auto; padding:10px;" id="admin-registry"></div>
-        <hr>
-        <h3>Security</h3>
-        <input type="password" id="new-admin-pass" placeholder="New Admin Password">
-        <button onclick="updateAdminPass()">Update Password</button>
-        <button onclick="document.getElementById('admin-modal').style.display='none'">Close</button>
-    </div>
-</div>
-
 <script>
-    const gun = Gun(['https://gun-manhattan.herokuapp.com/gun']);
-    let user = "";
-    let roomID = "";
-    let currentAdminPass = "admin123"; // Initial Default
-    let isAdmin = false;
+    // FIX: Multiple peers in case one is blocked
+    const gun = Gun([
+        'https://gun-manhattan.herokuapp.com/gun',
+        'https://peer.wall.org/gun',
+        'https://gundb.herokuapp.com/gun'
+    ]);
 
-    // Load saved admin pass from Mesh
-    gun.get('SYSTEM_CONFIG').get('admin_pass').on(p => { if(p) currentAdminPass = p; });
+    let username = "";
+    let activeRoom = "";
+    let isHost = false;
+    let blacklist = [];
 
-    // --- ENTRY LOGIC ---
-    function toggleEntry(showCreate) {
-        document.getElementById('create-section').style.display = showCreate ? 'block' : 'none';
-        document.getElementById('join-section').style.display = showCreate ? 'none' : 'block';
-    }
-
-    function finalizeCreate() {
-        user = document.getElementById('global-username').value;
-        let subject = document.getElementById('room-subject').value || "General Chat";
-        if(!user) return alert("Enter Name");
+    // --- SETUP ---
+    function createRoom() {
+        username = document.getElementById('my-name').value;
+        if(!username) return alert("Enter Name");
+        activeRoom = Math.floor(100000 + Math.random() * 900000).toString();
+        let subj = document.getElementById('room-subj').value || "General";
         
-        roomID = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit ID
-        gun.get('MASTER_REGISTRY_V6').get(roomID).put({id: roomID, subject: subject});
+        // Register Room and claim Host
+        gun.get('REGISTRY_V7').get(activeRoom).put({id: activeRoom, subject: subj, host: username});
+        isHost = true;
+        init();
+    }
+
+    function joinRoom() {
+        username = document.getElementById('my-name').value;
+        activeRoom = document.getElementById('join-id').value;
+        if(!username || !activeRoom) return alert("Fill all fields");
         
-        alert("Room Created! ID: " + roomID);
-        startChat();
+        gun.get('REGISTRY_V7').get(activeRoom).once(data => {
+            if(data && data.host === username) isHost = true;
+            init();
+        });
     }
 
-    function finalizeJoin() {
-        user = document.getElementById('global-username').value;
-        roomID = document.getElementById('room-id-input').value;
-        if(!user || !roomID) return alert("Fill all fields");
-        startChat();
+    function init() {
+        document.getElementById('setup-modal').style.display = 'none';
+        document.getElementById('display-id').innerText = "ID: " + activeRoom;
+        
+        // Get Subject
+        gun.get('REGISTRY_V7').get(activeRoom).get('subject').once(s => {
+            document.getElementById('topic-display').innerText = "# " + s;
+        });
+
+        startListening();
+        startPresence();
     }
 
-    function startChat() {
-        document.getElementById('entry-modal').style.display = 'none';
-        document.getElementById('chat-title').innerText = "# Room: " + roomID;
-        listen();
-    }
-
-    // --- CHAT LOGIC ---
+    // --- CORE CHAT & HOST TOOLS ---
     function send() {
-        let body = document.getElementById('msg-input').value;
+        let body = document.getElementById('msg-in').value;
         if(!body) return;
-        gun.get('CHATS_V6').get(roomID).get('msgs').set({user, body, time: Date.now()});
-        document.getElementById('msg-input').value = "";
+        gun.get('CHATS_V7').get(activeRoom).get('msgs').set({user: username, body, type: 'text', time: Date.now()});
+        document.getElementById('msg-in').value = "";
     }
 
-    function listen() {
-        gun.get('CHATS_V6').get(roomID).get('msgs').map().once((data, id) => {
-            if(!data) return;
+    function handleFile() {
+        const file = document.getElementById('file-up').files[0];
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            gun.get('CHATS_V7').get(activeRoom).get('msgs').set({
+                user: username, body: e.target.result, type: 'file', time: Date.now()
+            });
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function startListening() {
+        gun.get('CHATS_V7').get(activeRoom).get('msgs').map().once((data, id) => {
+            if(!data || blacklist.includes(data.user)) return;
+            
             const li = document.createElement('li');
             li.className = 'msg';
-            li.innerHTML = `<b>${data.user}</b> ${data.body}`;
+            let content = data.type === 'file' ? `<img src="${data.body}">` : data.body;
+            
+            // Host Tools: Delete and Remove
+            let tools = isHost ? `<span class="btn-host" onclick="delMsg('${id}')">DEL</span><span class="btn-host" onclick="banUser('${data.user}')">KICK</span>` : "";
+            
+            li.innerHTML = `<b>${data.user}</b> ${content} ${tools}`;
             document.getElementById('messages').appendChild(li);
             document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
         });
     }
 
-    // --- ADMIN DASHBOARD ---
-    let enters = 0;
-    window.addEventListener('keydown', (e) => {
-        if(e.key === "Enter") enters++;
-        if(e.shiftKey && e.key === "I" && enters >= 2) {
-            let p = prompt("Password:");
-            if(p === currentAdminPass) {
-                isAdmin = true;
-                document.getElementById('admin-modal').style.display = 'flex';
-                loadRegistry();
-            }
-            enters = 0;
-        }
-    });
+    function delMsg(id) {
+        gun.get('CHATS_V7').get(activeRoom).get('msgs').get(id).put(null);
+        location.reload(); // Refresh to clear deleted view
+    }
 
-    function loadRegistry() {
-        const reg = document.getElementById('admin-registry');
-        reg.innerHTML = "";
-        gun.get('MASTER_REGISTRY_V6').map().once((data, id) => {
-            if(data) reg.innerHTML += `<div>ID: ${id} | Subject: ${data.subject} <button onclick="joinCreated('${id}')">Enter</button></div>`;
+    function banUser(name) {
+        if(name === username) return;
+        blacklist.push(name);
+        alert(name + " removed from your view.");
+    }
+
+    // --- MEMBERS LIST ---
+    function startPresence() {
+        setInterval(() => {
+            gun.get('CHATS_V7').get(activeRoom).get('presence').get(username).put(Date.now());
+        }, 3000);
+
+        const list = document.getElementById('member-list');
+        gun.get('CHATS_V7').get(activeRoom).get('presence').map().on((time, name) => {
+            if(Date.now() - time < 8000) {
+                if(!document.getElementById('user-'+name)) {
+                    let div = document.createElement('div');
+                    div.id = 'user-'+name;
+                    div.className = 'member-item';
+                    div.innerHTML = `<div class="dot"></div> ${name}`;
+                    list.appendChild(div);
+                }
+            } else {
+                let el = document.getElementById('user-'+name);
+                if(el) el.remove();
+            }
         });
     }
 
-    function joinCreated(id) {
-        roomID = id;
-        document.getElementById('admin-modal').style.display = 'none';
-        startChat();
-    }
-
-    function updateAdminPass() {
-        let newP = document.getElementById('new-admin-pass').value;
-        if(newP.length < 4) return alert("Too short");
-        gun.get('SYSTEM_CONFIG').get('admin_pass').put(newP);
-        alert("Admin Password Changed Locally and on Mesh.");
+    function exportLogs() {
+        const text = document.getElementById('messages').innerText;
+        const blob = new Blob([text], {type: 'text/plain'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `chat_${activeRoom}.txt`;
+        a.click();
     }
 </script>
 </body>
