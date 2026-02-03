@@ -2,90 +2,92 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Educational Graph Project</title>
+    <title>Academic Research Portal - v4.2</title>
     <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style>
-        :root { --main: #36393f; --side: #2f3136; --accent: #7289da; --text: #dcddde; }
-        body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; background: var(--main); color: var(--text); overflow: hidden; }
+        :root { --bg: #ffffff; --text: #333; --accent: #4A90E2; }
+        body { font-family: "Times New Roman", serif; margin: 0; background: var(--bg); color: var(--text); display: flex; flex-direction: column; height: 100vh; transition: 0.3s; }
         
-        /* Sidebar */
-        .sidebar { width: 240px; background: var(--side); padding: 15px; display: flex; flex-direction: column; gap: 10px; border-right: 1px solid #202225; }
-        .sidebar h3 { font-size: 12px; text-transform: uppercase; color: #8e9297; margin-bottom: 5px; }
+        /* Stealth UI Elements */
+        header { padding: 15px 25px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; cursor: pointer; }
+        .logo { font-weight: bold; color: #444; }
         
-        /* Buttons */
-        button { padding: 8px; border-radius: 4px; border: none; cursor: pointer; background: #4f545c; color: white; transition: 0.2s; }
-        button:hover { background: var(--accent); }
-        .panic-btn { background: #ed4245; font-weight: bold; }
-        .public-btn { background: #43b581; font-weight: bold; }
+        #research-feed { flex: 1; overflow-y: auto; padding: 30px; line-height: 1.7; max-width: 900px; margin: 0 auto; width: 100%; }
+        .entry { margin-bottom: 20px; border-left: 2px solid #eee; padding-left: 15px; position: relative; }
+        .entry b { font-family: Arial, sans-serif; font-size: 11px; color: #888; text-transform: uppercase; }
+        
+        .input-area { padding: 20px; border-top: 1px solid #eee; display: flex; gap: 10px; background: #fff; justify-content: center; }
+        input { border: 1px solid #ddd; padding: 10px; border-radius: 3px; font-family: serif; }
+        .btn-save { background: var(--accent); color: white; border: none; padding: 10px 20px; cursor: pointer; font-weight: bold; }
 
-        /* Main Chat */
-        .chat-area { flex: 1; display: flex; flex-direction: column; }
-        #messages { flex: 1; overflow-y: auto; padding: 20px; list-style: none; margin: 0; }
-        .msg { background: #40444b; padding: 10px; border-radius: 8px; margin-bottom: 10px; position: relative; max-width: 85%; }
-        .msg b { color: var(--accent); display: block; font-size: 13px; }
-        .msg img { max-width: 100%; border-radius: 4px; margin-top: 5px; display: block; }
-        
-        /* Controls */
-        .input-box { padding: 20px; background: var(--main); display: flex; gap: 10px; align-items: center; }
-        input { background: #40444b; border: none; padding: 10px; color: white; border-radius: 5px; }
-        #msg-input { flex: 1; }
+        /* Hidden Hover Menu */
+        .stealth-menu { position: fixed; bottom: 10px; right: 10px; opacity: 0; display: flex; gap: 5px; }
+        .stealth-menu:hover { opacity: 1; }
+        .stealth-menu button { font-size: 10px; padding: 5px; background: #eee; border: 1px solid #ccc; cursor: pointer; }
 
-        /* Admin Dashboard Overlay */
-        #admin-dash { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; padding: 50px; }
-        .dash-content { background: var(--side); height: 100%; border-radius: 10px; padding: 20px; border: 2px solid var(--accent); }
-        .room-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #444; }
+        /* Fake Wikipedia Mode */
+        #wiki-mode { display: none; padding: 40px; overflow-y: auto; background: #fff; position: fixed; inset: 0; z-index: 500; }
+        
+        /* Modals */
+        .modal { display:none; position:fixed; inset:0; background:rgba(255,255,255,0.98); z-index:1000; padding:50px; border: 5px solid var(--accent); }
     </style>
 </head>
 <body>
 
-<div class="sidebar">
-    <button class="panic-btn" onclick="panic()">⚠️ EMERGENCY CLOSE</button>
+<div id="wiki-mode">
+    <h1 style="border-bottom: 1px solid #a2a9b1; font-family: serif; font-weight: normal;">Historiography</h1>
+    <p>From Wikipedia, the free encyclopedia...</p>
+    <p>Historiography is the study of the methods of historians in developing history as an academic discipline, and by extension is any body of historical work on a particular subject. The historiography of a specific topic covers how historians have studied that topic using particular sources, techniques, and theoretical approaches...</p>
     <hr>
-    <button class="public-btn" onclick="joinRoom('Global_Lobby')">🌍 Public Lobby</button>
-    <h3>Active Room</h3>
-    <input type="text" id="room-id" value="Global_Lobby" onchange="switchRoom()">
-    <h3>Channels</h3>
-    <button onclick="setChannel('general')">#general</button>
-    <button onclick="setChannel('files')">#files</button>
-    <hr>
-    <button onclick="exportChat()">💾 Save Logs</button>
+    <button onclick="toggleWiki()">Return to Data</button>
 </div>
 
-<div class="chat-area">
-    <ul id="messages"></ul>
-    <div class="input-box">
-        <input type="text" id="username" placeholder="User" style="width: 80px;">
-        <input type="file" id="file-hidden" style="display:none" onchange="uploadFile()">
-        <button onclick="document.getElementById('file-hidden').click()">📁</button>
-        <input type="text" id="msg-input" placeholder="Message..." onkeydown="if(event.key==='Enter') send()">
-        <button onclick="send()">Send</button>
-    </div>
+<header onclick="toggleWiki()">
+    <div class="logo">Project: Comparative Historiography (v4.2.1)</div>
+    <div style="font-size: 12px; color: #999;">Status: Connected to Mesh</div>
+</header>
+
+<div id="research-feed">
+    <p style="color: #999;"><i>Initializing peer-to-peer data synchronization...</i></p>
 </div>
 
-<div id="admin-dash">
-    <div class="dash-content">
-        <h2>Network Master Control</h2>
-        <div id="room-list" style="height: 300px; overflow-y: auto; background: #202225; margin-bottom: 20px;"></div>
-        <button onclick="document.getElementById('admin-dash').style.display='none'">Exit Dashboard</button>
-        <button onclick="location.reload()" style="background:orange">Refresh Network</button>
-    </div>
+<div class="input-area">
+    <input type="text" id="username" placeholder="Initials" style="width: 60px;">
+    <input type="text" id="msg-input" placeholder="Enter research note..." style="width: 400px;" onkeydown="if(event.key==='Enter') send()">
+    <button class="btn-save" onclick="send()">💾 Sync Note</button>
+</div>
+
+<div class="stealth-menu">
+    <button onclick="openPrivate()">🔐 Room</button>
+    <button onclick="joinPublic()">🌍 Global</button>
+    <button onclick="location.replace('https://google.com')">Panic</button>
+</div>
+
+<div id="admin-dash" class="modal">
+    <h2>Network Master Control</h2>
+    <div id="room-list" style="border: 1px solid #ddd; height: 300px; overflow: auto; padding: 10px; background: #fdfdfd;"></div>
+    <br>
+    <button onclick="this.parentElement.style.display='none'">Close Dashboard</button>
 </div>
 
 <script>
-    // 1. SYSTEM CONFIG
+    // --- CONFIGURATION ---
     const gun = Gun(['https://gun-manhattan.herokuapp.com/gun']);
-    let currentChannel = 'general';
+    let roomID = "Public_Research_Lobby";
+    let roomKey = ""; 
     let isAdmin = false;
-    let enterCount = 0;
-    let lastEnter = 0;
+    let isHost = false;
+    const SUPER_ADMIN_PASS = "YOUR_PASSWORD_HERE"; // <--- CHANGE THIS
 
-    // 2. PANIC SYSTEM
-    function panic() {
-        document.body.innerHTML = "";
-        window.location.replace("https://classroom.google.com");
+    // --- STEALTH LOGIC ---
+    function toggleWiki() {
+        const wiki = document.getElementById('wiki-mode');
+        wiki.style.display = (wiki.style.display === 'block') ? 'none' : 'block';
     }
 
-    // 3. KEYBOARD LISTENERS (Secret Admin Combo)
+    let enterCount = 0;
+    let lastEnter = 0;
     window.addEventListener('keydown', (e) => {
         const now = Date.now();
         if (e.key === "Enter") {
@@ -93,103 +95,105 @@
             lastEnter = now;
         }
         if (e.shiftKey && e.key === "I" && enterCount >= 2) {
-            e.preventDefault();
-            let p = prompt("Enter Super Admin Key:");
-            if (p === "YOUR_SUPER_SECRET_CODE") { // CHANGE THIS!
+            let p = prompt("Admin Access Code:");
+            if(p === SUPER_ADMIN_PASS) {
                 isAdmin = true;
-                document.getElementById('admin-dash').style.display = 'block';
-                scanRooms();
+                document.getElementById('admin-dash').style.display='block';
+                updateMasterRoomList();
             }
         }
-        if (e.key === "Escape") panic();
+        if (e.key === "Escape") location.replace("https://classroom.google.com");
     });
 
-    // 4. CHAT LOGIC
-    function joinRoom(id) {
-        document.getElementById('room-id').value = id;
-        switchRoom();
+    // --- ROOM LOGIC ---
+    function checkHost(id) {
+        gun.get('RESEARCH_DATA_V4').get(id).get('host_meta').once((host) => {
+            const current = document.getElementById('username').value || "Anon";
+            if (!host) {
+                gun.get('RESEARCH_DATA_V4').get(id).get('host_meta').put(current);
+                isHost = true;
+            } else if (host === current) {
+                isHost = true;
+            } else {
+                isHost = false;
+            }
+        });
     }
 
-    function switchRoom() {
-        document.getElementById('messages').innerHTML = "";
-        const room = document.getElementById('room-id').value;
-        gun.get('MASTER_ROOM_LIST').get(room).put(true);
+    function openPrivate() {
+        let id = prompt("Enter Room ID:");
+        let key = prompt("Enter Encryption Key (Private):");
+        if(id && key) {
+            roomID = id; roomKey = key;
+            checkHost(id);
+            gun.get('MASTER_REGISTRY').get(id).put(true);
+            listen();
+        }
+    }
+
+    function joinPublic() {
+        roomID = "Public_Research_Lobby"; roomKey = ""; isHost = false;
         listen();
     }
 
-    function setChannel(ch) {
-        currentChannel = ch;
-        document.getElementById('messages').innerHTML = "";
-        listen();
-    }
-
+    // --- CHAT LOGIC ---
     function send() {
-        const room = document.getElementById('room-id').value;
-        const user = document.getElementById('username').value || "Anon";
-        const text = document.getElementById('msg-input').value;
-        if(!text) return;
+        const user = document.getElementById('username').value || "ANON";
+        let body = document.getElementById('msg-input').value;
+        if(!body) return;
 
-        gun.get(room).get(currentChannel).set({
-            user, body: text, type: 'text', time: Date.now()
+        if(roomKey) {
+            body = "ENC:" + CryptoJS.AES.encrypt(body, roomKey).toString();
+        }
+
+        gun.get('RESEARCH_DATA_V4').get(roomID).set({
+            user, body, time: Date.now()
         });
         document.getElementById('msg-input').value = "";
     }
 
-    function uploadFile() {
-        const file = document.getElementById('file-hidden').files[0];
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const room = document.getElementById('room-id').value;
-            gun.get(room).get(currentChannel).set({
-                user: document.getElementById('username').value || "Anon",
-                body: e.target.result, type: 'file', time: Date.now()
-            });
-        };
-        reader.readAsDataURL(file);
+    function del(msgId) {
+        gun.get('RESEARCH_DATA_V4').get(roomID).get(msgId).put(null);
+        alert("Entry removed from mesh.");
+        listen();
     }
 
     function listen() {
-        const room = document.getElementById('room-id').value;
-        const list = document.getElementById('messages');
-        gun.get(room).get(currentChannel).map().once((data, id) => {
-            if (!data) return;
-            const li = document.createElement('li');
-            li.className = 'msg';
-            let content = data.type === 'file' ? `<img src="${data.body}">` : data.body;
-            
-            li.innerHTML = `<b>${data.user}</b> ${content}`;
-            if(isAdmin) {
-                li.innerHTML += `<button onclick="del('${id}')" style="font-size:9px;color:red;margin-left:10px">DEL</button>`;
+        const feed = document.getElementById('research-feed');
+        feed.innerHTML = `<p style="color:#aaa">--- Viewing Room: ${roomID} ---</p>`;
+        
+        gun.get('RESEARCH_DATA_V4').get(roomID).map().once((data, id) => {
+            if(!data) return;
+            let msg = data.body;
+
+            if(msg.startsWith("ENC:")) {
+                if(!roomKey) { msg = "[Encrypted Content]"; }
+                else {
+                    try {
+                        let bytes = CryptoJS.AES.decrypt(msg.replace("ENC:", ""), roomKey);
+                        msg = bytes.toString(CryptoJS.enc.Utf8) || "[Decryption Error]";
+                    } catch(e) { msg = "[Invalid Key]"; }
+                }
             }
-            list.appendChild(li);
-            list.scrollTop = list.scrollHeight;
+
+            const div = document.createElement('div');
+            div.className = 'entry';
+            let hostTools = (isHost || isAdmin) ? `<span onclick="del('${id}')" style="color:red;cursor:pointer;font-size:10px;margin-left:10px">[REMOVE]</span>` : "";
+            div.innerHTML = `<b>${data.user}</b> ${hostTools}<br>${msg}`;
+            feed.appendChild(div);
+            feed.scrollTop = feed.scrollHeight;
         });
     }
 
-    // 5. ADMIN TOOLS
-    function del(id) {
-        const room = document.getElementById('room-id').value;
-        gun.get(room).get(currentChannel).get(id).put(null);
-        location.reload(); 
-    }
-
-    function scanRooms() {
-        const listDiv = document.getElementById('room-list');
-        listDiv.innerHTML = "";
-        gun.get('MASTER_ROOM_LIST').map().once((val, key) => {
-            if(val) listDiv.innerHTML += `<div class="room-item"><span>${key}</span><button onclick="joinRoom('${key}')">Go</button></div>`;
+    function updateMasterRoomList() {
+        const list = document.getElementById('room-list');
+        list.innerHTML = "";
+        gun.get('MASTER_REGISTRY').map().once((val, key) => {
+            if(val) list.innerHTML += `<div style="padding:5px; border-bottom:1px solid #eee;">Room: ${key} <button onclick="roomID='${key}'; listen(); document.getElementById('admin-dash').style.display='none';">Join</button></div>`;
         });
     }
 
-    function exportChat() {
-        const blob = new Blob([document.getElementById('messages').innerText], {type: 'text/plain'});
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'chat_log.txt';
-        a.click();
-    }
-
-    listen(); // Start initial listener
+    listen();
 </script>
 </body>
 </html>
